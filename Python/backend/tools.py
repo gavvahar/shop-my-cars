@@ -1,0 +1,36 @@
+from langchain_core.tools import tool
+
+from . import db
+
+
+@tool
+def search_dataset(
+    max_price: float = None,
+    vehicle_style: str = None,
+    fuel_type: str = None,
+    limit: int = 15,
+) -> list[dict]:
+    """Search the local car specs database using structured filter criteria.
+
+    Use this when the user's requirements have already been extracted into
+    concrete filters (budget, vehicle style, fuel type) — this is a
+    structured SQL filter over historical spec/MSRP data, not a natural
+    language search. For fuzzy/open-ended questions this filter can't
+    answer, or for current market pricing/listings (this dataset only has
+    historical MSRP, not live prices), use search_web instead.
+
+    Args:
+        max_price: Maximum MSRP in dollars.
+        vehicle_style: Vehicle style/body type, e.g. "SUV", "Sedan", "Coupe".
+            Partial match, case-insensitive.
+        fuel_type: Fuel type, e.g. "regular unleaded", "diesel", "electric".
+            Partial match, case-insensitive.
+        limit: Maximum number of results to return.
+
+    Returns:
+        A list of car dicts (make, model, year, specs, msrp, etc.),
+        ordered by price ascending.
+    """
+    return db.search_cars(
+        max_price=max_price, vehicle_style=vehicle_style, fuel_type=fuel_type, limit=limit
+    )
