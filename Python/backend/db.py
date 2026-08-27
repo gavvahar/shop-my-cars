@@ -24,4 +24,4 @@ def get_sample_cars(limit=5):
         with conn.cursor() as cur:
             cur.execute(f"SELECT {CARS_COLUMNS} FROM cars LIMIT %s", (limit,))
             columns = [desc[0] for desc in cur.description]
-            return [dict(zip(columns, row)) for row in cur.fetchall()]
+            return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
