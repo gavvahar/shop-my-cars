@@ -27,6 +27,20 @@ def get_sample_cars(limit=5):
             return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
 
 
+def get_vehicle_styles():
+    with _pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT vehicle_style FROM cars")
+            return [row[0] for row in cur.fetchall()]
+
+
+def get_fuel_types():
+    with _pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT engine_fuel_type FROM cars")
+            return [row[0] for row in cur.fetchall()]
+
+
 def search_cars(max_price=None, vehicle_style=None, fuel_type=None, limit=15):
     conditions = []
     params = []
