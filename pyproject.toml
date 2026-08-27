@@ -96,12 +96,12 @@ commands = [
 [tool.tox.env."combined-imports-check"]
 skip_install = true
 deps = []
-commands = [["python3", "scripts/combined_imports_check.py"]]
+commands = [["python3", "Python/scripts/combined_imports_check.py"]]
 
 [tool.tox.env."no-classes-check"]
 skip_install = true
 deps = []
-commands = [["python3", "scripts/no_classes_check.py"]]
+commands = [["python3", "Python/scripts/no_classes_check.py"]]
 
 # --- Formatting -------------------------------------------------------------
 
@@ -112,7 +112,7 @@ allowlist_externals = ["npx"]
 commands = [
   [
     "python3",
-    "scripts/combined_imports_check.py",
+    "Python/scripts/combined_imports_check.py",
     "--fix",
   ],
   [
