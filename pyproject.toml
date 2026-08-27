@@ -180,6 +180,26 @@ commands = [
   ],
 ]
 
+# --- Security -----------------------------------------------------------
+
+[tool.tox.env."secret-detection"]
+skip_install = true
+allowlist_externals = ["docker"]
+commands = [
+  [
+    "docker",
+    "run",
+    "--rm",
+    "-v",
+    "{toxinidir}:/repo",
+    "trufflesecurity/trufflehog:latest",
+    "git",
+    "file:///repo",
+    "--results=verified,unknown",
+    "--fail",
+  ],
+]
+
 
 # --- Aggregate (CI) ---------------------------------------------------------
 
