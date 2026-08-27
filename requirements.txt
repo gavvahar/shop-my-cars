@@ -1,3 +1,11 @@
 ruff
 tox
 nodeenv
+fastapi
+uvicorn
+psycopg[binary]
+psycopg-pool
+python-dotenv
+ddgs
+langchain-ollama
+langchain-core
