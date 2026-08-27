@@ -195,7 +195,7 @@ commands = [
     "trufflesecurity/trufflehog:latest",
     "git",
     "file:///repo",
-    "--results=verified,unknown",
+    "--results=verified,unverified,unknown",
     "--fail",
   ],
 ]
