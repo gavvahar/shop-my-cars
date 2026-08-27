@@ -1,6 +1,8 @@
 from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 
+from .. import db
+
 OLLAMA_BASE_URL = "http://192.168.1.14:11434"
 MODEL = "qwen2.5:7b"
 
@@ -28,4 +30,30 @@ _structured_llm = _llm.with_structured_output(BuyerRequirements)
 def gather_requirements(user_message: str) -> BuyerRequirements:
     return _structured_llm.invoke(
         [("system", SYSTEM_PROMPT), ("human", user_message)]
+    )
+
+
+def _matches_real_value(extracted, real_values):
+    extracted_lower = extracted.lower()
+    return any(extracted_lower in real.lower() for real in real_values)
+
+
+def validate_requirements(requirements: BuyerRequirements) -> BuyerRequirements:
+    valid_styles = db.get_vehicle_styles()
+    valid_fuel_types = db.get_fuel_types()
+
+    vehicle_style = requirements.vehicle_style
+    fuel_type = requirements.fuel_type
+    must_haves = list(requirements.must_haves)
+
+    if vehicle_style is not None and not _matches_real_value(vehicle_style, valid_styles):
+        must_haves.append(vehicle_style)
+        vehicle_style = None
+
+    if fuel_type is not None and not _matches_real_value(fuel_type, valid_fuel_types):
+        must_haves.append(fuel_type)
+        fuel_type = None
+
+    return requirements.model_copy(
+        update={"vehicle_style": vehicle_style, "fuel_type": fuel_type, "must_haves": must_haves}
     )

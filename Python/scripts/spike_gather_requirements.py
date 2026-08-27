@@ -1,5 +1,9 @@
-"""Verification (Task 5): confirm gather_requirements extracts sensible
-structured criteria from varied buyer requests, live against Ollama.
+"""Verification (Task 5, refined): confirm gather_requirements +
+validate_requirements together produce clean, dataset-safe structured
+criteria — real category values only in vehicle_style/fuel_type,
+anything unmatched demoted to must_haves instead of silently passed
+through to search_dataset (which would return zero results on a bogus
+category value).
 
 Run directly: python Python/scripts/spike_gather_requirements.py
 """
@@ -8,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.agent.requirements import gather_requirements
+from backend.agent.requirements import gather_requirements, validate_requirements
 
 TEST_MESSAGES = [
     "I need a budget SUV under $25k",
@@ -18,14 +22,21 @@ TEST_MESSAGES = [
 ]
 
 
+def _print_requirements(label, requirements):
+    print(f"  [{label}]")
+    print(f"    max_price:     {requirements.max_price}")
+    print(f"    vehicle_style: {requirements.vehicle_style}")
+    print(f"    fuel_type:     {requirements.fuel_type}")
+    print(f"    must_haves:    {requirements.must_haves}")
+
+
 def main():
     for message in TEST_MESSAGES:
-        result = gather_requirements(message)
         print(f"--- {message!r}")
-        print(f"  max_price:     {result.max_price}")
-        print(f"  vehicle_style: {result.vehicle_style}")
-        print(f"  fuel_type:     {result.fuel_type}")
-        print(f"  must_haves:    {result.must_haves}")
+        raw = gather_requirements(message)
+        _print_requirements("before validate_requirements", raw)
+        validated = validate_requirements(raw)
+        _print_requirements("after validate_requirements", validated)
         print()
 
 
