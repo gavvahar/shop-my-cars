@@ -1,52 +1,23 @@
-"""Throwaway spike (Task 1): verify duckduckgo-search returns real,
-current results with zero API key/signup.
+"""Throwaway spike (Task 1, updated for Task 6): verify ddgs-backed web
+search still returns real, current results after search_web moved into
+backend/tools.py as a real LangChain @tool.
+
+The actual implementation now lives in backend/tools.py — this script
+just re-runs the same live check against the moved version, so it
+doubles as Task 6's post-move verification.
 
 Run directly: python Python/scripts/spike_web_search.py
 """
-import re
+import sys
+from pathlib import Path
 
-try:
-    from ddgs import DDGS
-except ImportError:
-    from duckduckgo_search import DDGS
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-
-def search_web(query: str, max_results: int = 5) -> list[dict]:
-    """Search the live web for current car pricing/availability info.
-
-    Use this for real-time market data (current asking prices, listings,
-    reviews) that the local car specs database can't provide — that
-    dataset only has historical MSRP and static specs, not live pricing.
-
-    Args:
-        query: A search query, e.g. "2016 Toyota Corolla current market price".
-        max_results: Maximum number of results to return.
-
-    Returns:
-        A list of dicts, each with keys "title", "snippet", "url", and
-        "price" (first dollar amount found in the snippet, or None).
-    """
-    with DDGS() as ddgs:
-        raw_results = ddgs.text(query, max_results=max_results)
-
-    results = []
-    for item in raw_results:
-        snippet = item.get("body", "")
-        price_match = re.search(r"\$[\d,]+(?:\.\d{2})?", snippet)
-        results.append(
-            {
-                "title": item.get("title", ""),
-                "snippet": snippet,
-                "url": item.get("href", ""),
-                "price": price_match.group(0) if price_match else None,
-            }
-        )
-    return results
-
+from backend.tools import search_web
 
 if __name__ == "__main__":
     query = "2016 Toyota Corolla current market price"
-    results = search_web(query)
+    results = search_web.invoke({"query": query})
 
     if not results:
         print("No results returned — check the query or package version/API.")
