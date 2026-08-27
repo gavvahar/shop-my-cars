@@ -23,7 +23,15 @@ SYSTEM_PROMPT = (
     "year, even if the make/model matches. Double-check each number against "
     "the exact row before writing it. Also do not swap city and highway MPG "
     "— state city MPG as city and highway MPG as highway, matching the "
-    "labeled columns in the dataset exactly as given."
+    "labeled columns in the dataset exactly as given.\n\n"
+    "Additionally: every dollar figure you state MUST be either that car's "
+    "exact MSRP from the dataset or a price explicitly given in a web "
+    "result's snippet — never invent a trade-in value, financing estimate, "
+    "or asking price that isn't literally present in the provided data. "
+    "Every source URL you cite in 'sources' MUST be copied exactly from a "
+    "web result's actual url field — never construct, guess, or format a "
+    "plausible-looking URL yourself, even if it looks like a real site's "
+    "typical URL pattern."
 )
 
 
@@ -85,7 +93,27 @@ def _find_source_rows(car, dataset_results):
     return [row for row in dataset_results if row["make"].lower() == car.make.lower() and row["model"].lower() == car.model.lower() and row["year"] == car.year]
 
 
-def _claim_matches_source(text, source_rows):
+DOLLAR_CLAIM_PATTERN = re.compile(r"\$[\d,]+(?:\.\d{2})?")
+URL_PATTERN = re.compile(r"https?://\S+")
+
+
+def _parse_dollar_amount(text):
+    return float(text.replace("$", "").replace(",", ""))
+
+
+def _real_dollar_amounts(source_rows, web_results):
+    amounts = {row["msrp"] for row in source_rows if row.get("msrp") is not None}
+    for result in web_results:
+        price_str = result.get("price")
+        if price_str:
+            try:
+                amounts.add(_parse_dollar_amount(price_str))
+            except ValueError:
+                pass
+    return amounts
+
+
+def _claim_matches_source(text, source_rows, web_results):
     for match in MPG_CLAIM_PATTERN.finditer(text):
         claimed = {int(match.group(1))}
         if match.group(2):
@@ -110,11 +138,40 @@ def _claim_matches_source(text, source_rows):
         if not claimed & real:
             return False
 
+    real_dollars = _real_dollar_amounts(source_rows, web_results)
+    for match in DOLLAR_CLAIM_PATTERN.finditer(text):
+        claimed_amount = _parse_dollar_amount(match.group(0))
+        if claimed_amount not in real_dollars:
+            return False
+
     return True
 
 
-def validate_comparison(comparison: CarComparison, dataset_results: list[dict]) -> CarComparison:
+def _validate_sources(sources, web_results):
+    real_urls = [result.get("url", "") for result in web_results if result.get("url")]
+    kept = []
+    dropped_count = 0
+    for source in sources:
+        urls_in_source = URL_PATTERN.findall(source)
+        if not urls_in_source:
+            kept.append(source)
+            continue
+        if any(
+            claimed_url in real_url or real_url in claimed_url
+            for claimed_url in urls_in_source
+            for real_url in real_urls
+        ):
+            kept.append(source)
+        else:
+            dropped_count += 1
+    return kept, dropped_count
+
+
+def validate_comparison(
+    comparison: CarComparison, dataset_results: list[dict], web_results: list[dict]
+) -> CarComparison:
     dropped_claims = []
+    dropped_sources = []
     fabricated_cars = []
     validated_cars = []
 
@@ -125,18 +182,36 @@ def validate_comparison(comparison: CarComparison, dataset_results: list[dict]) 
             fabricated_cars.append(f"{car.make} {car.model} ({car.year})")
             continue
 
-        kept_pros = [p for p in car.pros if _claim_matches_source(p, source_rows)]
-        kept_cons = [c for c in car.cons if _claim_matches_source(c, source_rows)]
+        kept_pros = [p for p in car.pros if _claim_matches_source(p, source_rows, web_results)]
+        kept_cons = [c for c in car.cons if _claim_matches_source(c, source_rows, web_results)]
         dropped_count = (len(car.pros) - len(kept_pros)) + (len(car.cons) - len(kept_cons))
         if dropped_count:
             dropped_claims.append(f"{car.make} {car.model} ({car.year}): {dropped_count} claim(s) removed")
 
-        validated_cars.append(car.model_copy(update={"pros": kept_pros, "cons": kept_cons}))
+        kept_sources, source_drop_count = _validate_sources(car.sources, web_results)
+        if source_drop_count:
+            dropped_sources.append(
+                f"{car.make} {car.model} ({car.year}): {source_drop_count} fabricated source(s) removed"
+            )
+
+        validated_cars.append(
+            car.model_copy(update={"pros": kept_pros, "cons": kept_cons, "sources": kept_sources})
+        )
 
     notes = comparison.notes
     if dropped_claims:
-        notes = (notes + " " if notes else "") + ("Data-accuracy check removed unverifiable claims: " + "; ".join(dropped_claims) + ".")
+        notes = (notes + " " if notes else "") + (
+            "Data-accuracy check removed unverifiable claims: " + "; ".join(dropped_claims) + "."
+        )
+    if dropped_sources:
+        notes = (notes + " " if notes else "") + (
+            "Removed source citation(s) that didn't match any real web result: "
+            + "; ".join(dropped_sources) + "."
+        )
     if fabricated_cars:
-        notes = (notes + " " if notes else "") + ("WARNING: could not match to any dataset result, excluded as likely fabricated: " + "; ".join(fabricated_cars) + ".")
+        notes = (notes + " " if notes else "") + (
+            "WARNING: could not match to any dataset result, excluded as likely fabricated: "
+            + "; ".join(fabricated_cars) + "."
+        )
 
     return comparison.model_copy(update={"cars": validated_cars, "notes": notes})

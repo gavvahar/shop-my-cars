@@ -44,7 +44,7 @@ def main():
     _print_comparison(raw_comparison)
 
     print("\n=== AFTER validate_comparison ===")
-    validated_comparison = validate_comparison(raw_comparison, dataset_results)
+    validated_comparison = validate_comparison(raw_comparison, dataset_results, web_results)
     _print_comparison(validated_comparison)
 
     raw_claim_count = sum(len(c.pros) + len(c.cons) for c in raw_comparison.cars)
@@ -58,10 +58,17 @@ def main():
 
     print("\n=== Degraded-web case (web_results=[]) ===")
     degraded_raw = compile_comparison(requirements, dataset_results, [])
-    degraded_validated = validate_comparison(degraded_raw, dataset_results)
+    degraded_validated = validate_comparison(degraded_raw, dataset_results, [])
     _print_comparison(degraded_validated)
 
-    print("\nManually cross-check remaining pros/cons above against the dataset_results printed at the top.")
+    print(
+        "Manually cross-check remaining pros/cons above against the dataset_results/web_results "
+        "printed earlier — specifically: (1) every dollar figure traces to either the car's real "
+        "MSRP or a real web result price, (2) every source URL actually appears in web_results' "
+        "url field, not just a plausible-looking invented one. This is now a standing check, not "
+        "a one-off — both fabrication classes (wrong-row numbers, invented URLs/prices) have shown "
+        "up in real runs."
+    )
 
 
 if __name__ == "__main__":

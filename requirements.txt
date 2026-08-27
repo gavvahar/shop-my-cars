@@ -9,3 +9,4 @@ python-dotenv
 ddgs
 langchain-ollama
 langchain-core
+langgraph
