@@ -66,9 +66,7 @@ _llm = ChatOllama(model=MODEL, base_url=OLLAMA_BASE_URL)
 _structured_llm = _llm.with_structured_output(CarComparison)
 
 
-def compile_comparison(
-    requirements: BuyerRequirements, dataset_results: list[dict], web_results: list[dict]
-) -> CarComparison:
+def compile_comparison(requirements: BuyerRequirements, dataset_results: list[dict], web_results: list[dict]) -> CarComparison:
     prompt = (
         f"Buyer requirements: max_price={requirements.max_price}, "
         f"vehicle_style={requirements.vehicle_style}, fuel_type={requirements.fuel_type}, "
@@ -84,13 +82,7 @@ HP_CLAIM_PATTERN = re.compile(r"(\d+)(?:-(\d+))?\s*hp\b", re.IGNORECASE)
 
 
 def _find_source_rows(car, dataset_results):
-    return [
-        row
-        for row in dataset_results
-        if row["make"].lower() == car.make.lower()
-        and row["model"].lower() == car.model.lower()
-        and row["year"] == car.year
-    ]
+    return [row for row in dataset_results if row["make"].lower() == car.make.lower() and row["model"].lower() == car.model.lower() and row["year"] == car.year]
 
 
 def _claim_matches_source(text, source_rows):
@@ -143,13 +135,8 @@ def validate_comparison(comparison: CarComparison, dataset_results: list[dict]) 
 
     notes = comparison.notes
     if dropped_claims:
-        notes = (notes + " " if notes else "") + (
-            "Data-accuracy check removed unverifiable claims: " + "; ".join(dropped_claims) + "."
-        )
+        notes = (notes + " " if notes else "") + ("Data-accuracy check removed unverifiable claims: " + "; ".join(dropped_claims) + ".")
     if fabricated_cars:
-        notes = (notes + " " if notes else "") + (
-            "WARNING: could not match to any dataset result, excluded as likely fabricated: "
-            + "; ".join(fabricated_cars) + "."
-        )
+        notes = (notes + " " if notes else "") + ("WARNING: could not match to any dataset result, excluded as likely fabricated: " + "; ".join(fabricated_cars) + ".")
 
     return comparison.model_copy(update={"cars": validated_cars, "notes": notes})

@@ -6,6 +6,7 @@ found in the first live run survives uncaught.
 
 Run directly: python Python/scripts/spike_compile_comparison.py
 """
+
 import sys
 from pathlib import Path
 
@@ -48,10 +49,7 @@ def main():
 
     raw_claim_count = sum(len(c.pros) + len(c.cons) for c in raw_comparison.cars)
     validated_claim_count = sum(len(c.pros) + len(c.cons) for c in validated_comparison.cars)
-    print(
-        f"\n{raw_claim_count - validated_claim_count} claim(s) removed by validate_comparison "
-        f"out of {raw_claim_count} total."
-    )
+    print(f"\n{raw_claim_count - validated_claim_count} claim(s) removed by validate_comparison out of {raw_claim_count} total.")
     print(
         "If this is 0: either the strengthened prompt alone avoided bad claims this run (LLM output "
         "is non-deterministic — re-run a few times, the original bugs may not reproduce every time), "

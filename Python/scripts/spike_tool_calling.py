@@ -3,6 +3,7 @@ LangChain tool calls via the self-hosted Ollama instance.
 
 Run directly: python Python/scripts/spike_tool_calling.py
 """
+
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
 

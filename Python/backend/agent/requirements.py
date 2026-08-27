@@ -28,9 +28,7 @@ _structured_llm = _llm.with_structured_output(BuyerRequirements)
 
 
 def gather_requirements(user_message: str) -> BuyerRequirements:
-    return _structured_llm.invoke(
-        [("system", SYSTEM_PROMPT), ("human", user_message)]
-    )
+    return _structured_llm.invoke([("system", SYSTEM_PROMPT), ("human", user_message)])
 
 
 def _matches_real_value(extracted, real_values):
@@ -54,6 +52,4 @@ def validate_requirements(requirements: BuyerRequirements) -> BuyerRequirements:
         must_haves.append(fuel_type)
         fuel_type = None
 
-    return requirements.model_copy(
-        update={"vehicle_style": vehicle_style, "fuel_type": fuel_type, "must_haves": must_haves}
-    )
+    return requirements.model_copy(update={"vehicle_style": vehicle_style, "fuel_type": fuel_type, "must_haves": must_haves})
