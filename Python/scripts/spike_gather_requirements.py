@@ -7,6 +7,7 @@ category value).
 
 Run directly: python Python/scripts/spike_gather_requirements.py
 """
+
 import sys
 from pathlib import Path
 

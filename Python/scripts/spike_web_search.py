@@ -8,6 +8,7 @@ doubles as Task 6's post-move verification.
 
 Run directly: python Python/scripts/spike_web_search.py
 """
+
 import sys
 from pathlib import Path
 

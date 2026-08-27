@@ -34,9 +34,7 @@ def search_dataset(
         A list of car dicts (make, model, year, specs, msrp, etc.),
         ordered by price ascending.
     """
-    return db.search_cars(
-        max_price=max_price, vehicle_style=vehicle_style, fuel_type=fuel_type, limit=limit
-    )
+    return db.search_cars(max_price=max_price, vehicle_style=vehicle_style, fuel_type=fuel_type, limit=limit)
 
 
 @tool

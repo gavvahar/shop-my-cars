@@ -3,6 +3,7 @@ ask-my-cars Postgres instance returns real rows.
 
 Run directly: python Python/scripts/spike_db_connection.py
 """
+
 import os, psycopg
 
 conninfo = psycopg.conninfo.make_conninfo(
