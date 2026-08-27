@@ -60,7 +60,7 @@ work_dir = "/tmp/.tox"
 # Shared base config inherited by all envs
 [tool.tox.env_run_base]
 pass_env = ["PATH"]
-set_env = { VIRTUALENV_OVERRIDE_APP_DATA = "{work_dir}/.virtualenv" }
+set_env = { VIRTUALENV_OVERRIDE_APP_DATA = "{work_dir}/.virtualenv", PRETTIER_GLOB = "**/*.{css,js,html,json,yml,yaml,md}" }
 
 # --- Linting ----------------------------------------------------------------
 
@@ -96,12 +96,12 @@ commands = [
 [tool.tox.env."combined-imports-check"]
 skip_install = true
 deps = []
-commands = [["python3", "Python/scripts/combined_imports_check.py"]]
+commands = [["python3", "scripts/combined_imports_check.py"]]
 
 [tool.tox.env."no-classes-check"]
 skip_install = true
 deps = []
-commands = [["python3", "Python/scripts/no_classes_check.py"]]
+commands = [["python3", "scripts/no_classes_check.py"]]
 
 # --- Formatting -------------------------------------------------------------
 
@@ -112,7 +112,7 @@ allowlist_externals = ["npx"]
 commands = [
   [
     "python3",
-    "Python/scripts/combined_imports_check.py",
+    "scripts/combined_imports_check.py",
     "--fix",
   ],
   [
@@ -136,7 +136,7 @@ commands = [
     "--write",
     "--log-level",
     "log",
-    "**/*.{css,js,html,json,yml,yaml,md}",
+    "{env:PRETTIER_GLOB}",
   ],
   [
     "npx",
@@ -147,17 +147,15 @@ commands = [
   ],
 ]
 
+[tool.tox.env.scss]
+skip_install = true
+allowlist_externals = ["npx"]
+commands = [["npx", "sass", "--no-source-map", "static/scss:static/css"]]
+
 [tool.tox.env.prettier]
 skip_install = true
 allowlist_externals = ["npx"]
-commands = [
-  [
-    "npx",
-    "prettier",
-    "--check",
-    "**/*.{css,js,html,json,yml,yaml,md}",
-  ],
-]
+commands = [["npx", "prettier", "--check", "{env:PRETTIER_GLOB}"]]
 
 [tool.tox.env."toml-lint"]
 skip_install = true
@@ -199,7 +197,6 @@ commands = [
     "--fail",
   ],
 ]
-
 
 # --- Aggregate (CI) ---------------------------------------------------------
 
@@ -246,4 +243,20 @@ commands = [
 skip_install = true
 deps = []
 allowlist_externals = ["tox"]
-commands = [["tox", "-e", "format"], ["tox", "-e", "github"]]
+commands = [
+  [
+    "tox",
+    "-e",
+    "format",
+  ],
+  [
+    "tox",
+    "-e",
+    "github",
+  ],
+  [
+    "tox",
+    "-e",
+    "secret-detection",
+  ],
+]
