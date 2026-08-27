@@ -1,3 +1,6 @@
+import re
+
+from ddgs import DDGS
 from langchain_core.tools import tool
 
 from . import db
@@ -34,3 +37,40 @@ def search_dataset(
     return db.search_cars(
         max_price=max_price, vehicle_style=vehicle_style, fuel_type=fuel_type, limit=limit
     )
+
+
+@tool
+def search_web(query: str, max_results: int = 5) -> list[dict]:
+    """Search the live web for current car pricing, listings, and reviews.
+
+    Use this for information the local dataset can't provide — current
+    market pricing, active listings, recent reviews — since the dataset
+    only has historical MSRP and static specs. Works best with a specific
+    make/model/year in the query, e.g. "2016 Toyota Corolla current market
+    price". For structured filtering over the known dataset (budget,
+    vehicle style, fuel type), use search_dataset instead.
+
+    Args:
+        query: A search query, ideally including make/model/year.
+        max_results: Maximum number of results to return.
+
+    Returns:
+        A list of dicts, each with keys "title", "snippet", "url", and
+        "price" (first dollar amount found in the snippet, or None).
+    """
+    with DDGS() as ddgs:
+        raw_results = ddgs.text(query, max_results=max_results)
+
+    results = []
+    for item in raw_results:
+        snippet = item.get("body", "")
+        price_match = re.search(r"\$[\d,]+(?:\.\d{2})?", snippet)
+        results.append(
+            {
+                "title": item.get("title", ""),
+                "snippet": snippet,
+                "url": item.get("href", ""),
+                "price": price_match.group(0) if price_match else None,
+            }
+        )
+    return results
