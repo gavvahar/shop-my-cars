@@ -9,29 +9,33 @@ SYSTEM_PROMPT = (
     "You compare cars for a buyer based ONLY on the dataset results and web "
     "results provided below. Never invent a spec, price, or fact not present "
     "in that data — if you don't have a piece of information, omit it rather "
-    "than guessing. For each car's pros/cons, note in the 'sources' field "
-    "whether the claim came from the dataset or a specific web result URL. "
-    "Compare only the 3-5 most relevant candidates, not every result provided "
-    "— prioritize based on the buyer's stated requirements. If no web results "
-    "are available, still produce a comparison using the dataset alone, and "
-    "set the 'notes' field to mention that current market pricing wasn't "
+    "than guessing.\n\n"
+    "Do NOT fill in msrp, highway_mpg, city_mpg, or horsepower yourself — "
+    "leave those fields null. They are populated automatically from the "
+    "dataset after you respond, so restating them is unnecessary and risks "
+    "getting them wrong.\n\n"
+    "Write pros/cons as QUALITATIVE, comparative statements (e.g. 'more "
+    "fuel-efficient than the other option', 'stronger highway range', "
+    "'noticeably more powerful') rather than restating exact numbers — the "
+    "exact figures are shown separately and authoritatively, so you don't "
+    "need to (and shouldn't) cite them in prose. If a number does slip into "
+    "your prose anyway, make sure it belongs to the specific car/row being "
+    "described, not a similar row for a different year, and never swap "
+    "city vs. highway MPG.\n\n"
+    "For each car's pros/cons, note in the 'sources' field whether the claim "
+    "came from the dataset or a specific web result URL. Compare only the "
+    "3-5 most relevant candidates, not every result provided — prioritize "
+    "based on the buyer's stated requirements. If no web results are "
+    "available, still produce a comparison using the dataset alone, and set "
+    "the 'notes' field to mention that current market pricing wasn't "
     "available.\n\n"
-    "CRITICAL — numeric accuracy: when multiple dataset rows share the same "
-    "make and model but differ by year (or trim), every number you state for "
-    "a specific car (MPG, horsepower, etc.) MUST come from that car's own "
-    "row — never borrow a number from a similar-looking row for a different "
-    "year, even if the make/model matches. Double-check each number against "
-    "the exact row before writing it. Also do not swap city and highway MPG "
-    "— state city MPG as city and highway MPG as highway, matching the "
-    "labeled columns in the dataset exactly as given.\n\n"
-    "Additionally: every dollar figure you state MUST be either that car's "
-    "exact MSRP from the dataset or a price explicitly given in a web "
-    "result's snippet — never invent a trade-in value, financing estimate, "
-    "or asking price that isn't literally present in the provided data. "
-    "Every source URL you cite in 'sources' MUST be copied exactly from a "
-    "web result's actual url field — never construct, guess, or format a "
-    "plausible-looking URL yourself, even if it looks like a real site's "
-    "typical URL pattern."
+    "Every dollar figure you DO mention in prose (e.g. describing a web "
+    "listing's price) MUST be either that car's exact MSRP from the dataset "
+    "or a price explicitly given in a web result's snippet — never invent a "
+    "trade-in value, financing estimate, or asking price that isn't "
+    "literally present in the provided data. Every source URL you cite in "
+    "'sources' MUST be copied exactly from a web result's actual url field "
+    "— never construct, guess, or format a plausible-looking URL yourself."
 )
 
 
@@ -39,7 +43,10 @@ class CarSummary(BaseModel):
     make: str
     model: str
     year: int
-    msrp: float | None = Field(default=None, description="Historical MSRP from the dataset, if available.")
+    msrp: float | None = Field(default=None, description="Populated programmatically from the dataset, not LLM-stated.")
+    highway_mpg: int | None = Field(default=None, description="Populated programmatically from the dataset, not LLM-stated.")
+    city_mpg: int | None = Field(default=None, description="Populated programmatically from the dataset, not LLM-stated.")
+    horsepower: float | None = Field(default=None, description="Populated programmatically from the dataset, not LLM-stated.")
     pros: list[str] = Field(default_factory=list)
     cons: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list, description="'dataset' or a specific web result URL per claim.")
@@ -85,8 +92,12 @@ def compile_comparison(requirements: BuyerRequirements, dataset_results: list[di
     return _structured_llm.invoke([("system", SYSTEM_PROMPT), ("human", prompt)])
 
 
-MPG_CLAIM_PATTERN = re.compile(r"(\d+)(?:-(\d+))?\s*mpg\s*(city|highway)?", re.IGNORECASE)
-HP_CLAIM_PATTERN = re.compile(r"(\d+)(?:-(\d+))?\s*hp\b", re.IGNORECASE)
+MPG_CLAIM_PATTERN = re.compile(
+    r"(\d+)(?:-(\d+))?\s*(?:(city|highway)\s+)?"
+    r"(?:mpg|mi(?:le)?s?(?:\s+per\s+|/)gal(?:lon)?s?)\s*(city|highway)?",
+    re.IGNORECASE,
+)
+HP_CLAIM_PATTERN = re.compile(r"(\d+)(?:-(\d+))?\s*(?:hp\b|horsepower)", re.IGNORECASE)
 
 
 def _find_source_rows(car, dataset_results):
@@ -114,29 +125,14 @@ def _real_dollar_amounts(source_rows, web_results):
 
 
 def _claim_matches_source(text, source_rows, web_results):
-    for match in MPG_CLAIM_PATTERN.finditer(text):
-        claimed = {int(match.group(1))}
-        if match.group(2):
-            claimed.add(int(match.group(2)))
-        label = (match.group(3) or "").lower()
-
-        if label == "city":
-            real = {row["city_mpg"] for row in source_rows}
-        elif label == "highway":
-            real = {row["highway_mpg"] for row in source_rows}
-        else:
-            real = {row["city_mpg"] for row in source_rows} | {row["highway_mpg"] for row in source_rows}
-
-        if not claimed & real:
-            return False
-
-    for match in HP_CLAIM_PATTERN.finditer(text):
-        claimed = {int(match.group(1))}
-        if match.group(2):
-            claimed.add(int(match.group(2)))
-        real = {row["engine_hp"] for row in source_rows}
-        if not claimed & real:
-            return False
+    # MPG/HP figures are now redundant with the code-populated authoritative
+    # fields on CarSummary (msrp, highway_mpg, city_mpg, horsepower) — rather
+    # than trying to validate individual numbers in free-form comparative
+    # prose (e.g. "20 vs 19 MPG", where extraction regexes keep finding new
+    # phrasing gaps), strip any claim that mentions one of these units at
+    # all. The real numbers are already shown separately and authoritatively.
+    if MPG_CLAIM_PATTERN.search(text) or HP_CLAIM_PATTERN.search(text):
+        return False
 
     real_dollars = _real_dollar_amounts(source_rows, web_results)
     for match in DOLLAR_CLAIM_PATTERN.finditer(text):
@@ -156,20 +152,14 @@ def _validate_sources(sources, web_results):
         if not urls_in_source:
             kept.append(source)
             continue
-        if any(
-            claimed_url in real_url or real_url in claimed_url
-            for claimed_url in urls_in_source
-            for real_url in real_urls
-        ):
+        if any(claimed_url in real_url or real_url in claimed_url for claimed_url in urls_in_source for real_url in real_urls):
             kept.append(source)
         else:
             dropped_count += 1
     return kept, dropped_count
 
 
-def validate_comparison(
-    comparison: CarComparison, dataset_results: list[dict], web_results: list[dict]
-) -> CarComparison:
+def validate_comparison(comparison: CarComparison, dataset_results: list[dict], web_results: list[dict]) -> CarComparison:
     dropped_claims = []
     dropped_sources = []
     fabricated_cars = []
@@ -190,28 +180,38 @@ def validate_comparison(
 
         kept_sources, source_drop_count = _validate_sources(car.sources, web_results)
         if source_drop_count:
-            dropped_sources.append(
-                f"{car.make} {car.model} ({car.year}): {source_drop_count} fabricated source(s) removed"
-            )
+            dropped_sources.append(f"{car.make} {car.model} ({car.year}): {source_drop_count} fabricated source(s) removed")
 
-        validated_cars.append(
-            car.model_copy(update={"pros": kept_pros, "cons": kept_cons, "sources": kept_sources})
-        )
+        validated_cars.append(car.model_copy(update={"pros": kept_pros, "cons": kept_cons, "sources": kept_sources}))
 
     notes = comparison.notes
     if dropped_claims:
-        notes = (notes + " " if notes else "") + (
-            "Data-accuracy check removed unverifiable claims: " + "; ".join(dropped_claims) + "."
-        )
+        notes = (notes + " " if notes else "") + ("Data-accuracy check removed unverifiable claims: " + "; ".join(dropped_claims) + ".")
     if dropped_sources:
-        notes = (notes + " " if notes else "") + (
-            "Removed source citation(s) that didn't match any real web result: "
-            + "; ".join(dropped_sources) + "."
-        )
+        notes = (notes + " " if notes else "") + ("Removed source citation(s) that didn't match any real web result: " + "; ".join(dropped_sources) + ".")
     if fabricated_cars:
-        notes = (notes + " " if notes else "") + (
-            "WARNING: could not match to any dataset result, excluded as likely fabricated: "
-            + "; ".join(fabricated_cars) + "."
-        )
+        notes = (notes + " " if notes else "") + ("WARNING: could not match to any dataset result, excluded as likely fabricated: " + "; ".join(fabricated_cars) + ".")
 
     return comparison.model_copy(update={"cars": validated_cars, "notes": notes})
+
+
+def apply_authoritative_specs(comparison: CarComparison, dataset_results: list[dict]) -> CarComparison:
+    updated_cars = []
+    for car in comparison.cars:
+        source_rows = _find_source_rows(car, dataset_results)
+        if not source_rows:
+            updated_cars.append(car)
+            continue
+
+        primary_row = source_rows[0]
+        updated_cars.append(
+            car.model_copy(
+                update={
+                    "msrp": primary_row.get("msrp"),
+                    "highway_mpg": primary_row.get("highway_mpg"),
+                    "city_mpg": primary_row.get("city_mpg"),
+                    "horsepower": primary_row.get("engine_hp"),
+                }
+            )
+        )
+    return comparison.model_copy(update={"cars": updated_cars})

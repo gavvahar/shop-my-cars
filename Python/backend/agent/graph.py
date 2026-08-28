@@ -4,7 +4,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 
-from .comparison import CarComparison, compile_comparison, validate_comparison
+from .comparison import CarComparison, apply_authoritative_specs, compile_comparison, validate_comparison
 from .requirements import BuyerRequirements, gather_requirements, validate_requirements
 from ..tools import search_dataset, search_web
 
@@ -35,9 +35,7 @@ def gather_requirements_node(state):
 
 
 def confirm_requirements_node(state):
-    decision = interrupt(
-        {"type": "confirm_requirements", "requirements": state["requirements"].model_dump()}
-    )
+    decision = interrupt({"type": "confirm_requirements", "requirements": state["requirements"].model_dump()})
     return {
         "human_decision": decision.get("action", "approve"),
         "refinement_text": decision.get("refinement", ""),
@@ -80,7 +78,8 @@ def search_web_node(state):
 def compile_comparison_node(state):
     raw = compile_comparison(state["requirements"], state["dataset_results"], state["web_results"])
     validated = validate_comparison(raw, state["dataset_results"], state["web_results"])
-    return {"comparison": validated}
+    finalized = apply_authoritative_specs(validated, state["dataset_results"])
+    return {"comparison": finalized}
 
 
 def human_review_node(state):
@@ -100,9 +99,7 @@ def route_after_review(state):
 def finalize_handoff_node(state):
     comparison = state["comparison"]
     summary = (
-        f"Research complete — {len(comparison.cars)} car(s) compared. "
-        f"This summary is for your reference; no purchase or seller contact has been made. "
-        f"{comparison.notes}"
+        f"Research complete — {len(comparison.cars)} car(s) compared. This summary is for your reference; no purchase or seller contact has been made. {comparison.notes}"
     ).strip()
     return {"summary": summary}
 
