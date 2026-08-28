@@ -8,9 +8,9 @@ from . import db
 
 @tool
 def search_dataset(
-    max_price: float = None,
-    vehicle_style: str = None,
-    fuel_type: str = None,
+    max_price: float | None = None,
+    vehicle_style: str | None = None,
+    fuel_type: str | None = None,
     limit: int = 15,
 ) -> list[dict]:
     """Search the local car specs database using structured filter criteria.

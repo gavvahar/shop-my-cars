@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.agent.comparison import compile_comparison, validate_comparison
+from backend.agent.comparison import apply_authoritative_specs, compile_comparison, validate_comparison
 from backend.agent.requirements import BuyerRequirements
 from backend.tools import search_dataset, search_web
 
@@ -20,10 +20,27 @@ from backend.tools import search_dataset, search_web
 def _print_comparison(comparison):
     for car in comparison.cars:
         print(f"\n{car.make} {car.model} ({car.year}) - MSRP: {car.msrp}")
+        print(f"  highway_mpg: {car.highway_mpg}, city_mpg: {car.city_mpg}, hp: {car.horsepower}")
         print(f"  pros: {car.pros}")
         print(f"  cons: {car.cons}")
         print(f"  sources: {car.sources}")
     print(f"\nnotes: {comparison.notes}")
+
+
+def _check_authoritative_specs(comparison, dataset_results):
+    for car in comparison.cars:
+        source_rows = [row for row in dataset_results if row["make"].lower() == car.make.lower() and row["model"].lower() == car.model.lower() and row["year"] == car.year]
+        if not source_rows:
+            print(f"  {car.make} {car.model} ({car.year}): NO MATCHING ROW (should already be dropped)")
+            continue
+        primary_row = source_rows[0]
+        matches = (
+            car.msrp == primary_row.get("msrp")
+            and car.highway_mpg == primary_row.get("highway_mpg")
+            and car.city_mpg == primary_row.get("city_mpg")
+            and car.horsepower == primary_row.get("engine_hp")
+        )
+        print(f"  {car.make} {car.model} ({car.year}): {'OK' if matches else 'MISMATCH'}")
 
 
 def main():
@@ -44,8 +61,15 @@ def main():
     _print_comparison(raw_comparison)
 
     print("\n=== AFTER validate_comparison ===")
-    validated_comparison = validate_comparison(raw_comparison, dataset_results)
+    validated_comparison = validate_comparison(raw_comparison, dataset_results, web_results)
     _print_comparison(validated_comparison)
+
+    print("\n=== AFTER apply_authoritative_specs ===")
+    final_comparison = apply_authoritative_specs(validated_comparison, dataset_results)
+    _print_comparison(final_comparison)
+
+    print("\n=== Trivial correctness check: typed fields vs. source rows ===")
+    _check_authoritative_specs(final_comparison, dataset_results)
 
     raw_claim_count = sum(len(c.pros) + len(c.cons) for c in raw_comparison.cars)
     validated_claim_count = sum(len(c.pros) + len(c.cons) for c in validated_comparison.cars)
@@ -58,10 +82,18 @@ def main():
 
     print("\n=== Degraded-web case (web_results=[]) ===")
     degraded_raw = compile_comparison(requirements, dataset_results, [])
-    degraded_validated = validate_comparison(degraded_raw, dataset_results)
-    _print_comparison(degraded_validated)
+    degraded_validated = validate_comparison(degraded_raw, dataset_results, [])
+    degraded_final = apply_authoritative_specs(degraded_validated, dataset_results)
+    _print_comparison(degraded_final)
 
-    print("\nManually cross-check remaining pros/cons above against the dataset_results printed at the top.")
+    print(
+        "Manually cross-check remaining pros/cons above against the dataset_results/web_results "
+        "printed earlier — specifically: (1) every dollar figure traces to either the car's real "
+        "MSRP or a real web result price, (2) every source URL actually appears in web_results' "
+        "url field, not just a plausible-looking invented one. This is now a standing check, not "
+        "a one-off — both fabrication classes (wrong-row numbers, invented URLs/prices) have shown "
+        "up in real runs."
+    )
 
 
 if __name__ == "__main__":
