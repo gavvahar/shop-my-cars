@@ -43,10 +43,10 @@ save_shortlist ──▶ finalize_handoff
 
 ## Setup & Running
 
-Requires: a reachable Postgres instance with the car-specs dataset (shared with `ask-my-cars`), a reachable Ollama instance, Docker.
+Requires: a reachable Postgres instance with the car-specs dataset (shared with `ask-my-cars`, running on the same host), a reachable Ollama instance, Docker. This app is standalone — it doesn't join `ask-my-cars`' Docker network or depend on how that project runs, only that its Postgres is reachable on the host.
 
-1. Copy `.env.example` to `.env` and fill in `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD` (host/port and `OLLAMA_BASE_URL` already have working defaults).
-2. `docker compose up --build` — builds from the repo's `Dockerfile` and runs the app on **port 8000** (see `compose.yml`). This app deliberately does **not** run its own Postgres container; it connects to the existing `ask-my-cars` instance as a client.
+1. Copy `.env.example` to `.env` and fill in `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD` (`OLLAMA_BASE_URL` already has a working default; `POSTGRES_HOST`/`POSTGRES_PORT` are only used for local, non-Docker script runs — `compose.yml` itself overrides `POSTGRES_HOST` to `host.docker.internal` for the containerized path).
+2. `docker compose up --build` — builds from the repo's `Dockerfile` and runs the app on **port 8000** (see `compose.yml`). This app deliberately does **not** run its own Postgres container; it connects to the existing `ask-my-cars` instance as a client, reachable on the host via `host.docker.internal`.
 3. Open `http://localhost:8000` in a browser and start a conversation.
 
 For local iteration without Docker Compose, the various `Python/scripts/spike_*.py` scripts exercise individual pieces (dataset search, web search, the full graph including both interrupts and the save path) directly against a real Postgres/Ollama instance — useful for debugging a specific layer without the HTTP/UI round-trip.

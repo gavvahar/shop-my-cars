@@ -1,18 +1,28 @@
 # This app does NOT run its own Postgres. It connects to the existing
-# ask-my-cars Postgres instance over the LAN (POSTGRES_HOST in .env,
-# confirmed reachable at 192.168.1.128:5432 per Task 3's verification)
-# instead of provisioning a duplicate database. Do NOT add a postgres
-# service here — ask-my-cars' Postgres is the system of record for this
-# data, this repo only ever reads/writes to it as a client.
+# ask-my-cars Postgres instance as a client instead of provisioning a
+# duplicate database. Do NOT add a postgres service here — ask-my-cars'
+# Postgres is the system of record for this data, this repo only ever
+# reads/writes to it as a client.
+#
+# Deliberately standalone: this compose file does NOT join ask-my-cars'
+# Docker network or depend on that project's compose being up in any
+# particular way. It reaches Postgres via host.docker.internal (the
+# extra_hosts entry below makes that resolve on Linux too, not just
+# Docker Desktop) — Postgres just needs to be reachable on the host,
+# not part of this compose project.
 services:
   app:
     build: .
-    # POSTGRES_HOST in .env is "localhost" (Postgres runs on this same
-    # host) -- host networking is required for the container to reach it,
-    # same as every docker run --network host used to verify this app
-    # throughout development. Also means the app listens directly on the
-    # host's port 8000 (see Dockerfile's EXPOSE) -- no ports: mapping needed.
-    network_mode: host
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
+    environment:
+      # .env has POSTGRES_HOST=localhost for local (non-Docker) script runs
+      # (Python/scripts/spike_*.py) -- "localhost" inside this container
+      # means the container itself, not the host, so this overrides just
+      # that one var for the containerized path.
+      POSTGRES_HOST: host.docker.internal
     restart: unless-stopped
