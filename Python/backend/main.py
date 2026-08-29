@@ -42,9 +42,7 @@ def index(request: Request):
 def _invoke_graph(graph, config, message=None, resume=None):
     if resume is not None:
         return graph.invoke(Command(resume=resume), config=config)
-    return graph.invoke(
-        {"buyer_message": message, "thread_id": config["configurable"]["thread_id"]}, config=config
-    )
+    return graph.invoke({"buyer_message": message, "thread_id": config["configurable"]["thread_id"]}, config=config)
 
 
 @app.post("/api/agent")
@@ -65,9 +63,7 @@ def agent_turn(request: Request, body: dict):
     try:
         result = future.result(timeout=REQUEST_TIMEOUT_SECONDS)
     except FutureTimeoutError as err:
-        raise HTTPException(
-            status_code=504, detail="This is taking longer than expected — the agent may still be working."
-        ) from err
+        raise HTTPException(status_code=504, detail="This is taking longer than expected — the agent may still be working.") from err
     except Exception as err:
         raise HTTPException(status_code=502, detail="The agent hit an error processing that request.") from err
 

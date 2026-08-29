@@ -102,11 +102,11 @@ header h1 {
 }
 
 .car-summary {
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #eee;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #eee;
 }
 
 .car-summary:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
