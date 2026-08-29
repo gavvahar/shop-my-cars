@@ -1,13 +1,38 @@
+import sqlite3
+from contextlib import closing, contextmanager
 from typing import TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 
 from .comparison import CarComparison, apply_authoritative_specs, compile_comparison, validate_comparison
 from .requirements import BuyerRequirements, gather_requirements, validate_requirements
-from ..shortlists import save_shortlist
+from ..shortlists import DB_PATH as SHORTLISTS_DB_PATH, save_shortlist
 from ..tools import search_dataset, search_web
+
+CHECKPOINT_DB_PATH = SHORTLISTS_DB_PATH.parent / "checkpoints.db"
+
+# State holds live Pydantic objects (BuyerRequirements, CarComparison) directly.
+# Without an explicit allow-list, LangGraph's msgpack serde deserializes them via
+# a fallback that logs a deprecation warning and will be blocked in a future version.
+CHECKPOINT_ALLOWED_MSGPACK_MODULES = [
+    ("backend.agent.requirements", "BuyerRequirements"),
+    ("backend.agent.comparison", "CarComparison"),
+]
+
+
+@contextmanager
+def open_checkpointer(db_path=CHECKPOINT_DB_PATH):
+    """Open a persistent SQLite checkpointer. Caller keeps the `with` block open
+    for as long as the graph built against it is in use (e.g. app lifetime)."""
+    serde = JsonPlusSerializer(allowed_msgpack_modules=CHECKPOINT_ALLOWED_MSGPACK_MODULES)
+    with closing(sqlite3.connect(str(db_path), check_same_thread=False)) as conn:
+        checkpointer = SqliteSaver(conn, serde=serde)
+        checkpointer.setup()
+        yield checkpointer
+
 
 GraphState = TypedDict(
     "GraphState",
@@ -130,7 +155,7 @@ def finalize_handoff_node(state):
     return {"summary": summary}
 
 
-def build_graph():
+def build_graph(checkpointer):
     graph = StateGraph(GraphState)
 
     graph.add_node("gather_requirements", gather_requirements_node)
@@ -170,5 +195,4 @@ def build_graph():
     graph.add_edge("save_shortlist", "finalize_handoff")
     graph.add_edge("finalize_handoff", END)
 
-    checkpointer = MemorySaver()
     return graph.compile(checkpointer=checkpointer)
