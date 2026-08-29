@@ -4,3 +4,4 @@ node_modules
 shortlists.db
 checkpoints.db
 __pycache__/
+.vscode
