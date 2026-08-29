@@ -3,3 +3,4 @@ node_modules
 .env
 shortlists.db
 checkpoints.db
+__pycache__/
