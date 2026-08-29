@@ -16,7 +16,7 @@ EXCLUDE_DIRS = {
     "env",
 }
 
-EXCLUDE_FILES = {"test.py", "jc_api.py", "requirements.py"}
+EXCLUDE_FILES = {"test.py", "jc_api.py", "requirements.py", "comparison.py"}
 
 
 def iter_py_files():

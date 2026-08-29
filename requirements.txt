@@ -3,9 +3,12 @@ tox
 nodeenv
 fastapi
 uvicorn
+jinja2
 psycopg[binary]
 psycopg-pool
 python-dotenv
 ddgs
 langchain-ollama
 langchain-core
+langgraph
+langgraph-checkpoint-sqlite

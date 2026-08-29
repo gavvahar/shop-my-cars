@@ -1,3 +1,7 @@
 .lh
 node_modules
 .env
+shortlists.db
+checkpoints.db
+__pycache__/
+.vscode

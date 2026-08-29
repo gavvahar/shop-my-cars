@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Shop My Cars</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Shop My Cars</h1>
+      <p class="subtitle">Your AI car-buying research assistant</p>
+    </header>
+
+    <main>
+      <section id="chat-log" aria-live="polite">
+        <!-- Messages appended here by chat.js -->
+      </section>
+
+      <section id="pending-action" class="pending-action" hidden>
+        <h2 id="pending-action-title"></h2>
+        <div id="pending-action-content"></div>
+        <div id="pending-action-buttons" class="button-row"></div>
+      </section>
+
+      <form id="chat-form">
+        <input
+          type="text"
+          id="chat-input"
+          placeholder="e.g. I need a budget SUV under $25k"
+          autocomplete="off"
+        />
+        <button type="submit">Send</button>
+      </form>
+    </main>
+
+    <script src="/static/js/chat.js"></script>
+  </body>
+</html>
