@@ -7,8 +7,12 @@
 services:
   app:
     build: .
-    ports:
-      - "8000:8000"
+    # POSTGRES_HOST in .env is "localhost" (Postgres runs on this same
+    # host) -- host networking is required for the container to reach it,
+    # same as every docker run --network host used to verify this app
+    # throughout development. Also means the app listens directly on the
+    # host's port 8000 (see Dockerfile's EXPOSE) -- no ports: mapping needed.
+    network_mode: host
     env_file:
       - .env
     restart: unless-stopped
