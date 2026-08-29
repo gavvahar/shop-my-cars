@@ -1,4 +1,4 @@
-import os
+import os, threading
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from contextlib import asynccontextmanager
@@ -14,7 +14,23 @@ from .agent.graph import build_graph, open_checkpointer
 BASE_DIR = Path(__file__).resolve().parent
 
 _executor = ThreadPoolExecutor(max_workers=4)
-REQUEST_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "300"))
+REQUEST_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "360"))
+
+_in_flight_lock = threading.Lock()
+_in_flight_thread_ids = set()
+
+
+def _try_acquire(thread_id):
+    with _in_flight_lock:
+        if thread_id in _in_flight_thread_ids:
+            return False
+        _in_flight_thread_ids.add(thread_id)
+        return True
+
+
+def _release(thread_id):
+    with _in_flight_lock:
+        _in_flight_thread_ids.discard(thread_id)
 
 
 @asynccontextmanager
@@ -56,16 +72,29 @@ def agent_turn(request: Request, body: dict):
     if not message and not resume:
         raise HTTPException(status_code=400, detail="Either 'message' or 'resume' is required.")
 
+    if not _try_acquire(thread_id):
+        return {
+            "status": "busy",
+            "detail": "Still working on your previous request for this conversation — please wait and try again shortly.",
+        }
+
     graph = request.app.state.graph
     config = {"configurable": {"thread_id": thread_id}}
-
     future = _executor.submit(_invoke_graph, graph, config, message=message, resume=resume)
+
     try:
         result = future.result(timeout=REQUEST_TIMEOUT_SECONDS)
     except FutureTimeoutError as err:
-        raise HTTPException(status_code=504, detail="This is taking longer than expected — the agent may still be working.") from err
+        future.add_done_callback(lambda f: _release(thread_id))
+        raise HTTPException(
+            status_code=504,
+            detail="This is taking longer than expected — still working in the background, safe to check back shortly.",
+        ) from err
     except Exception as err:
+        _release(thread_id)
         raise HTTPException(status_code=502, detail="The agent hit an error processing that request.") from err
+
+    _release(thread_id)
 
     interrupts = result.get("__interrupt__")
     if interrupts:

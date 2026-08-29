@@ -73,6 +73,14 @@ async function callAgent(body) {
 function handleAgentResponse(data) {
   if (!data) return;
 
+  if (data.status === "busy") {
+    appendMessage(
+      "agent",
+      data.detail || "Still working on your previous request — please wait.",
+    );
+    return;
+  }
+
   if (data.status === "done") {
     appendMessage("agent", data.summary);
     hidePendingAction();
