@@ -21,6 +21,42 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from langgraph.types import Command
 
 from backend.agent.graph import build_graph
+from backend.shortlists import get_shortlists_by_thread
+
+
+def _run_full_flow(graph, thread_id, buyer_message, review_action, confirm_action=None):
+    config = {"configurable": {"thread_id": thread_id}}
+    graph.invoke({"buyer_message": buyer_message, "thread_id": thread_id}, config=config)
+    graph.invoke(Command(resume={"action": "approve"}), config=config)  # confirm_requirements
+    graph.invoke(Command(resume={"action": review_action}), config=config)  # human_review
+    if review_action == "save":
+        graph.invoke(Command(resume={"action": confirm_action}), config=config)  # confirm_save
+
+
+def test_save_paths(graph):
+    print("=== Save-path test 1: approve (no save requested) ===")
+    thread_id = "spike-save-test-approve"
+    _run_full_flow(graph, thread_id, "I need a budget SUV under $25k", review_action="approve")
+    rows = get_shortlists_by_thread(thread_id)
+    print(f"Rows persisted: {len(rows)} (expect 0)")
+    assert len(rows) == 0
+
+    print("\n=== Save-path test 2: save + confirm ===")
+    thread_id = "spike-save-test-save-confirm"
+    _run_full_flow(graph, thread_id, "I need a budget SUV under $25k", review_action="save", confirm_action="confirm")
+    rows = get_shortlists_by_thread(thread_id)
+    print(f"Rows persisted: {len(rows)} (expect 1)")
+    assert len(rows) == 1
+    print(f"Persisted row: {rows[0]}")
+
+    print("\n=== Save-path test 3: save + decline at second confirmation ===")
+    thread_id = "spike-save-test-save-decline"
+    _run_full_flow(graph, thread_id, "I need a budget SUV under $25k", review_action="save", confirm_action="decline")
+    rows = get_shortlists_by_thread(thread_id)
+    print(f"Rows persisted: {len(rows)} (expect 0)")
+    assert len(rows) == 0
+
+    print("\nAll save-path checks passed.")
 
 
 def main():
@@ -28,7 +64,7 @@ def main():
     config = {"configurable": {"thread_id": "spike-test-1"}}
 
     print("=== Turn 1: initial invoke ===")
-    result = graph.invoke({"buyer_message": "I need a budget SUV under $25k"}, config=config)
+    result = graph.invoke({"buyer_message": "I need a budget SUV under $25k", "thread_id": "spike-test-1"}, config=config)
     print(f"Paused at interrupt: {result.get('__interrupt__')}")
 
     print("\n=== Resuming interrupt 1 (confirm_requirements) with 'approve' ===")
@@ -78,6 +114,11 @@ def main():
         "(Numeric specs are now code-populated and checked above — no manual number "
         "cross-referencing needed for those anymore.)"
     )
+
+    print("\n\n" + "=" * 60)
+    print("Task 9: save_shortlist path verification")
+    print("=" * 60)
+    test_save_paths(graph)
 
 
 if __name__ == "__main__":

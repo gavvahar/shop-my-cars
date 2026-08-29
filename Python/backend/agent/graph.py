@@ -6,12 +6,14 @@ from langgraph.types import interrupt
 
 from .comparison import CarComparison, apply_authoritative_specs, compile_comparison, validate_comparison
 from .requirements import BuyerRequirements, gather_requirements, validate_requirements
+from ..shortlists import save_shortlist
 from ..tools import search_dataset, search_web
 
 GraphState = TypedDict(
     "GraphState",
     {
         "buyer_message": str,
+        "thread_id": str,
         "requirements": BuyerRequirements,
         "dataset_results": list,
         "web_results": list,
@@ -93,7 +95,31 @@ def human_review_node(state):
 def route_after_review(state):
     if state["human_decision"] == "refine":
         return "gather_requirements"
+    if state["human_decision"] == "save":
+        return "confirm_save"
     return "finalize_handoff"
+
+
+def confirm_save_node(state):
+    decision = interrupt(
+        {
+            "type": "confirm_save",
+            "comparison": state["comparison"].model_dump(),
+            "message": "About to permanently save this shortlist. Confirm?",
+        }
+    )
+    return {"human_decision": decision.get("action", "decline")}
+
+
+def route_after_confirm_save(state):
+    if state["human_decision"] == "confirm":
+        return "save_shortlist"
+    return "finalize_handoff"
+
+
+def save_shortlist_node(state):
+    save_shortlist(state["thread_id"], state["requirements"], state["comparison"])
+    return {}
 
 
 def finalize_handoff_node(state):
@@ -113,6 +139,8 @@ def build_graph():
     graph.add_node("search_web", search_web_node)
     graph.add_node("compile_comparison", compile_comparison_node)
     graph.add_node("human_review", human_review_node)
+    graph.add_node("confirm_save", confirm_save_node)
+    graph.add_node("save_shortlist", save_shortlist_node)
     graph.add_node("finalize_handoff", finalize_handoff_node)
 
     graph.set_entry_point("gather_requirements")
@@ -128,8 +156,18 @@ def build_graph():
     graph.add_conditional_edges(
         "human_review",
         route_after_review,
-        {"finalize_handoff": "finalize_handoff", "gather_requirements": "gather_requirements"},
+        {
+            "finalize_handoff": "finalize_handoff",
+            "gather_requirements": "gather_requirements",
+            "confirm_save": "confirm_save",
+        },
     )
+    graph.add_conditional_edges(
+        "confirm_save",
+        route_after_confirm_save,
+        {"save_shortlist": "save_shortlist", "finalize_handoff": "finalize_handoff"},
+    )
+    graph.add_edge("save_shortlist", "finalize_handoff")
     graph.add_edge("finalize_handoff", END)
 
     checkpointer = MemorySaver()
