@@ -23,7 +23,9 @@ SYSTEM_PROMPT = (
     "described, not a similar row for a different year, and never swap "
     "city vs. highway MPG.\n\n"
     "For each car's pros/cons, note in the 'sources' field whether the claim "
-    "came from the dataset or a specific web result URL. Compare only the "
+    "came from the dataset or a specific web result URL. When a claim comes "
+    "from the dataset, use exactly the word 'dataset' in sources — not a "
+    "description or restated fact. Compare only the "
     "3-5 most relevant candidates, not every result provided — prioritize "
     "based on the buyer's stated requirements. If no web results are "
     "available, still produce a comparison using the dataset alone, and set "
@@ -143,16 +145,23 @@ def _claim_matches_source(text, source_rows, web_results):
     return True
 
 
+def _is_valid_dataset_source(source):
+    normalized = source.strip().strip(".").lower()
+    return normalized in {"dataset", "the dataset", "car dataset", "local dataset"}
+
+
 def _validate_sources(sources, web_results):
     real_urls = [result.get("url", "") for result in web_results if result.get("url")]
     kept = []
     dropped_count = 0
     for source in sources:
         urls_in_source = URL_PATTERN.findall(source)
-        if not urls_in_source:
-            kept.append(source)
-            continue
-        if any(claimed_url in real_url or real_url in claimed_url for claimed_url in urls_in_source for real_url in real_urls):
+        if urls_in_source:
+            if any(claimed_url in real_url or real_url in claimed_url for claimed_url in urls_in_source for real_url in real_urls):
+                kept.append(source)
+            else:
+                dropped_count += 1
+        elif _is_valid_dataset_source(source):
             kept.append(source)
         else:
             dropped_count += 1

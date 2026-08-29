@@ -31,8 +31,18 @@ def gather_requirements(user_message: str) -> BuyerRequirements:
     return _structured_llm.invoke([("system", SYSTEM_PROMPT), ("human", user_message)])
 
 
-def _matches_real_value(extracted, real_values):
+# Generic/ambiguous tokens that substring-match a real fuel_type value but don't
+# actually mean that value to a buyer -- e.g. "gas" is a substring of the real
+# category "natural gas", but a buyer saying "good on gas" means fuel-efficient
+# gasoline, not a natural-gas vehicle. Confirmed live during Task 14's eval:
+# this narrowed real search results down to just the 2 natural-gas rows.
+AMBIGUOUS_FUEL_TOKENS = {"gas"}
+
+
+def _matches_real_value(extracted, real_values, ambiguous_tokens=frozenset()):
     extracted_lower = extracted.lower()
+    if extracted_lower in ambiguous_tokens:
+        return False
     return any(extracted_lower in real.lower() for real in real_values)
 
 
@@ -48,7 +58,7 @@ def validate_requirements(requirements: BuyerRequirements) -> BuyerRequirements:
         must_haves.append(vehicle_style)
         vehicle_style = None
 
-    if fuel_type is not None and not _matches_real_value(fuel_type, valid_fuel_types):
+    if fuel_type is not None and not _matches_real_value(fuel_type, valid_fuel_types, AMBIGUOUS_FUEL_TOKENS):
         must_haves.append(fuel_type)
         fuel_type = None
 
