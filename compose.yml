@@ -1,6 +1,7 @@
 # This app does NOT run its own Postgres. It connects to the existing
-# ask-my-cars Postgres instance over the LAN (POSTGRES_HOST in .env,
-# confirmed reachable at 192.168.1.128:5432 per Task 3's verification)
+# ask-my-cars Postgres instance as a client (POSTGRES_HOST in .env —
+# "localhost" on this host, since Postgres runs directly on the same
+# machine; a different host would instead need its actual LAN IP there)
 # instead of provisioning a duplicate database. Do NOT add a postgres
 # service here — ask-my-cars' Postgres is the system of record for this
 # data, this repo only ever reads/writes to it as a client.
