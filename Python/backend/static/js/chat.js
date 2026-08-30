@@ -30,6 +30,31 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function showTyping() {
+  const log = document.getElementById("chat-log");
+  const indicator = document.createElement("div");
+  indicator.className = "typing-indicator";
+  indicator.id = "typing-indicator";
+  indicator.innerHTML = "<span></span><span></span><span></span>";
+  log.appendChild(indicator);
+  log.scrollTop = log.scrollHeight;
+}
+
+function hideTyping() {
+  const indicator = document.getElementById("typing-indicator");
+  if (indicator) indicator.remove();
+}
+
+function setInputDisabled(disabled) {
+  document.getElementById("chat-input").disabled = disabled;
+  document.querySelector("#chat-form button").disabled = disabled;
+  document
+    .querySelectorAll("#pending-action-buttons button")
+    .forEach((button) => {
+      button.disabled = disabled;
+    });
+}
+
 function showPendingAction(title, contentHtml, buttons) {
   const panel = document.getElementById("pending-action");
   document.getElementById("pending-action-title").textContent = title;
@@ -55,6 +80,9 @@ function hidePendingAction() {
 async function callAgent(body) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 310000);
+
+  setInputDisabled(true);
+  showTyping();
 
   try {
     const response = await fetch("/api/agent", {
@@ -82,6 +110,9 @@ async function callAgent(body) {
       "The request timed out or failed. Please try again.",
     );
     return null;
+  } finally {
+    hideTyping();
+    setInputDisabled(false);
   }
 }
 
@@ -107,6 +138,10 @@ function handleAgentResponse(data) {
   }
 }
 
+function specChip(label, value) {
+  return `<span class="spec-chip">${label}: ${value ?? "?"}</span>`;
+}
+
 function renderInterrupt(interrupt) {
   if (interrupt.type === "confirm_requirements") {
     const req = interrupt.requirements;
@@ -130,10 +165,15 @@ function renderInterrupt(interrupt) {
       .map(
         (car) => `
                     <div class="car-summary">
-                        <strong>${car.make} ${car.model} (${car.year})</strong> — $${car.msrp ?? "?"}
-                        <br>Highway MPG: ${car.highway_mpg ?? "?"}, City MPG: ${car.city_mpg ?? "?"}, HP: ${car.horsepower ?? "?"}
-                        <ul>${car.pros.map((p) => `<li>+ ${escapeHtml(p)}</li>`).join("")}${car.cons
-                          .map((c) => `<li>- ${escapeHtml(c)}</li>`)
+                        <div class="car-title">${car.make} ${car.model} (${car.year})</div>
+                        <div class="spec-chips">
+                            ${specChip("MSRP", car.msrp != null ? `$${car.msrp}` : null)}
+                            ${specChip("Hwy MPG", car.highway_mpg)}
+                            ${specChip("City MPG", car.city_mpg)}
+                            ${specChip("HP", car.horsepower)}
+                        </div>
+                        <ul>${car.pros.map((p) => `<li class="pro">+ ${escapeHtml(p)}</li>`).join("")}${car.cons
+                          .map((c) => `<li class="con">- ${escapeHtml(c)}</li>`)
                           .join("")}</ul>
                     </div>
                 `,
