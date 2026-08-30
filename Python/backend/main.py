@@ -12,6 +12,13 @@ from langgraph.types import Command
 from .agent.graph import build_graph, open_checkpointer
 
 BASE_DIR = Path(__file__).resolve().parent
+# Cache-busting query param for static assets referenced in index.html --
+# tied to the newest mtime across the whole static/ tree (not just one
+# file) so ANY change to ANY static asset forces browsers to fetch fresh
+# copies instead of serving a stale cached one (Cache-Control headers
+# alone don't help a browser that already cached a file before those
+# headers existed).
+ASSET_VERSION = str(int(max(p.stat().st_mtime for p in (BASE_DIR / "static").rglob("*") if p.is_file())))
 
 _executor = ThreadPoolExecutor(max_workers=4)
 REQUEST_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "360"))
@@ -45,6 +52,18 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    # Default StaticFiles sends no explicit Cache-Control, so browsers apply
+    # heuristic caching and can keep serving a stale chat.js/style.css
+    # indefinitely after a real update -- confirmed live: a fixed bug kept
+    # failing silently in the browser because the old JS was still cached.
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -52,7 +71,7 @@ def health():
 
 @app.get("/")
 def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {})
+    return templates.TemplateResponse(request, "index.html", {"asset_version": ASSET_VERSION})
 
 
 def _invoke_graph(graph, config, message=None, resume=None):

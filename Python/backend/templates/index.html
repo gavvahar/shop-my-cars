@@ -2,37 +2,59 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Shop My Cars</title>
-    <link rel="stylesheet" href="/static/css/style.css" />
+    <script>
+      (function () {
+        var theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.setAttribute("data-theme", theme);
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/css/style.css?v={{ asset_version }}" />
   </head>
   <body>
-    <header>
-      <h1>Shop My Cars</h1>
-      <p class="subtitle">Your AI car-buying research assistant</p>
-    </header>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="brand-mark">S</div>
+          <div>
+            <h1>Shop My Cars</h1>
+            <p class="subtitle">Your AI car-buying research assistant</p>
+          </div>
+        </div>
+        <div id="theme-toggle" class="theme-toggle">
+          <button type="button" data-theme="light">Light</button>
+          <button type="button" data-theme="dark">Dark</button>
+          <button type="button" data-theme="system">System</button>
+        </div>
+      </header>
 
-    <main>
-      <section id="chat-log" aria-live="polite">
-        <!-- Messages appended here by chat.js -->
-      </section>
+      <main>
+        <section id="chat-log" aria-live="polite">
+          <!-- Messages appended here by chat.js -->
+        </section>
 
-      <section id="pending-action" class="pending-action" hidden>
-        <h2 id="pending-action-title"></h2>
-        <div id="pending-action-content"></div>
-        <div id="pending-action-buttons" class="button-row"></div>
-      </section>
+        <section id="pending-action" class="pending-action" hidden>
+          <h2 id="pending-action-title"></h2>
+          <div id="pending-action-content"></div>
+          <div id="pending-action-buttons" class="button-row"></div>
+        </section>
 
-      <form id="chat-form">
-        <input
-          type="text"
-          id="chat-input"
-          placeholder="e.g. I need a budget SUV under $25k"
-          autocomplete="off"
-        />
-        <button type="submit">Send</button>
-      </form>
-    </main>
+        <form id="chat-form">
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="e.g. I need a budget SUV under $25k"
+            autocomplete="off"
+          />
+          <button type="submit">Send</button>
+        </form>
+      </main>
+    </div>
 
-    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/theme.js?v={{ asset_version }}"></script>
+    <script src="/static/js/chat.js?v={{ asset_version }}"></script>
   </body>
 </html>

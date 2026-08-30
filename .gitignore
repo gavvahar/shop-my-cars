@@ -5,3 +5,4 @@ shortlists.db
 checkpoints.db
 __pycache__/
 .vscode
+data/*.csv
