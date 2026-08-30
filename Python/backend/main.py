@@ -45,6 +45,18 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    # Default StaticFiles sends no explicit Cache-Control, so browsers apply
+    # heuristic caching and can keep serving a stale chat.js/style.css
+    # indefinitely after a real update -- confirmed live: a fixed bug kept
+    # failing silently in the browser because the old JS was still cached.
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

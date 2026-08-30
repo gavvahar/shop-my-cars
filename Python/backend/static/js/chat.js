@@ -1,4 +1,19 @@
-const threadId = crypto.randomUUID();
+function generateThreadId() {
+  // crypto.randomUUID() only exists in secure contexts (https:// or
+  // http://localhost) -- accessing this app over plain http:// via a LAN
+  // IP silently breaks the whole script at this line otherwise, since
+  // crypto.randomUUID is simply undefined there.
+  if (window.crypto && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+const threadId = generateThreadId();
 
 function appendMessage(role, text) {
   const log = document.getElementById("chat-log");
