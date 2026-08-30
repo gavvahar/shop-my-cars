@@ -78,7 +78,7 @@ save_shortlist ──▶ finalize_handoff
 
 ## Tools
 
-- **`search_dataset`** (READ) — `Python/backend/tools.py`. Structured filter (`max_price`, `vehicle_style`, `fuel_type`) over the historical car-specs Postgres dataset, shared with the sibling `ask-my-cars` project. Partial `ILIKE` matching (dataset values are compound strings like `"4dr SUV"`), cheapest-first ordering.
+- **`search_dataset`** (READ) — `Python/backend/tools.py`. Structured filter (`max_price`, `vehicle_style`, `fuel_type`) over this app's own local car-specs Postgres dataset (seeded from the same source CSV used by this project's sibling repos, but its own independent database — no runtime dependency on those repos). Partial `ILIKE` matching (dataset values are compound strings like `"4dr SUV"`), cheapest-first ordering.
 - **`search_web`** (READ) — live web search via `ddgs` (DuckDuckGo, zero signup/API key) for current market pricing, since the dataset only has historical MSRP.
 - **`save_shortlist`** (WRITE) — `Python/backend/shortlists.py`. The only write action anywhere in this system. Persists to a local SQLite file (`shortlists.db`), gated behind its own `confirm_save` interrupt in addition to `human_review`. Deliberately a plain function, not an LLM-callable `@tool` — it should never be something the model decides to invoke on its own, only deterministic graph routing after an explicit human confirmation.
 
@@ -93,7 +93,7 @@ This is a distinct concept from `save_shortlist`'s `shortlists.db` — the check
 - **Agent**: [LangGraph](https://langchain-ai.github.io/langgraph/) + [LangChain](https://python.langchain.com/) (`langgraph`, `langchain-core`, `langchain-ollama`, `langgraph-checkpoint-sqlite`)
 - **Model**: self-hosted [Ollama](https://ollama.com/) (`qwen2.5:7b` by default), configured via `OLLAMA_BASE_URL`
 - **Web**: FastAPI + Jinja2 + vanilla JS (no frontend framework/build step)
-- **Database**: PostgreSQL (`psycopg[binary]`, `psycopg-pool`), shared with `ask-my-cars`
+- **Database**: PostgreSQL (`psycopg[binary]`, `psycopg-pool`), self-contained — its own `postgres` service in `compose.yml`, seeded from a local CSV
 - **Web search**: `ddgs`
 - **Local persistence**: SQLite (both the checkpointer and saved shortlists)
 - **Dev tooling**: `tox`, `ruff` (lint + format), `prettier`, `textlint`, TruffleHog (secret detection)
@@ -130,22 +130,22 @@ shop-my-cars/
 
 ## Setup & Running
 
-**Requires:** a reachable Postgres instance with the car-specs dataset (shared with `ask-my-cars`, running on the same host), a reachable Ollama instance, Docker.
-
-This app is standalone — it doesn't join `ask-my-cars`' Docker network or depend on how that project is run, only that its Postgres is reachable on the host.
+**Requires:** Docker, a reachable Ollama instance. This app is fully standalone — it runs its own Postgres (seeded from a local CSV) and doesn't depend on any other project's database or network.
 
 | Variable                                              | Used by                             | Notes                                                                                                   |
 | ----------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Both                                | Fill in from your Postgres instance                                                                     |
-| `POSTGRES_HOST` / `POSTGRES_PORT`                     | Local (non-Docker) script runs only | `compose.yml` overrides `POSTGRES_HOST` to `host.docker.internal` for the containerized path            |
-| `OLLAMA_BASE_URL`                                     | Both                                | Has a working default in `.env.example`                                                                 |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Both                                | Yours to choose — this is this app's own database, not shared with anything else                        |
+| `POSTGRES_HOST` / `POSTGRES_PORT`                     | Local (non-Docker) script runs only | `compose.yml` overrides both to the internal `postgres` service address for the containerized path      |
+| `OLLAMA_BASE_URL`                                     | Both                                | Needs a reachable Ollama instance                                                                       |
 | `AGENT_TIMEOUT_SECONDS`                               | Containerized app only              | Optional, defaults to `360` — how long `/api/agent` waits on a single graph turn before returning a 504 |
 
 **Steps:**
 
-1. Copy `.env.example` to `.env` and fill in the Postgres credentials.
-2. `docker compose up --build` — builds from the repo's `Dockerfile` and runs the app on **port 8000**. Reaches Postgres via `host.docker.internal` (works on Linux too, via the `extra_hosts` entry in `compose.yml`).
-3. Open `http://localhost:8000` in a browser and start a conversation.
+1. Copy `.env.example` to `.env` and fill in real values.
+2. Place the source dataset at `data/cars.csv` (gitignored, not committed — the "Car Features and MSRP" dataset, same one used by this project's sibling repos).
+3. `docker compose up postgres -d`, then `docker compose --profile seed run seed` — creates the schema and loads the dataset. **Required once before first real use**; there's no automatic seed-on-startup.
+4. `docker compose up --build` — builds from the repo's `Dockerfile` and runs the app on **port 8000**.
+5. Open `http://localhost:8000` in a browser and start a conversation.
 
 For local iteration without Docker, the `Python/scripts/spike_*.py` scripts exercise individual pieces (dataset search, web search, tool-calling reliability, the full graph including both interrupts and the save/persistence paths) directly against a real Postgres/Ollama instance — useful for debugging one layer without the HTTP/UI round-trip.
 
