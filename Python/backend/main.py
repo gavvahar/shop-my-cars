@@ -12,6 +12,13 @@ from langgraph.types import Command
 from .agent.graph import build_graph, open_checkpointer
 
 BASE_DIR = Path(__file__).resolve().parent
+# Cache-busting query param for static assets referenced in index.html --
+# tied to the newest mtime across the whole static/ tree (not just one
+# file) so ANY change to ANY static asset forces browsers to fetch fresh
+# copies instead of serving a stale cached one (Cache-Control headers
+# alone don't help a browser that already cached a file before those
+# headers existed).
+ASSET_VERSION = str(int(max(p.stat().st_mtime for p in (BASE_DIR / "static").rglob("*") if p.is_file())))
 
 _executor = ThreadPoolExecutor(max_workers=4)
 REQUEST_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "360"))
@@ -64,7 +71,7 @@ def health():
 
 @app.get("/")
 def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {})
+    return templates.TemplateResponse(request, "index.html", {"asset_version": ASSET_VERSION})
 
 
 def _invoke_graph(graph, config, message=None, resume=None):
